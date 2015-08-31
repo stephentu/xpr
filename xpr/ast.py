@@ -138,7 +138,7 @@ class UnaryFunc(Expr):
         return "{}({})".format(self._name(), str(self.arg))
 
 
-class Log(UnaryFunc):
+class NativeFloatToFloatFunc(UnaryFunc):
 
     def __init__(self, arg):
         UnaryFunc.__init__(self, arg)
@@ -146,24 +146,44 @@ class Log(UnaryFunc):
     def _coerce_type(self):
         return float
 
-    def _name(self):
-        return "Log"
-
     def _compile(self, ctx):
         arg = self.arg._compile(ctx)
         if self.arg._coerce_type() != float:
             arg = ctx.builder.sitofp(arg, ir.DoubleType())
-        libm = ctx.library("m")
-        f = libm.log
-        f.argtypes = [ctypes.c_double]
-        f.restype = ctypes.c_double
 
-        log_addr = ctypes.cast(libm.log, ctypes.c_void_p).value
+        f = self._get_native_function(ctx)
+        log_addr = ctypes.cast(f, ctypes.c_void_p).value
 
         log_ty = ir.FunctionType(ir.DoubleType(), [ir.DoubleType()])
         # TODO(stephentu): generate random names to avoid name clashing
         f = ctx.builder.inttoptr(ir.Constant(ir.IntType(64), log_addr), log_ty.as_pointer(), name='LogFunc')
         return ctx.builder.call(f, [arg])
+
+
+class Log(NativeFloatToFloatFunc):
+
+    def __init__(self, arg):
+        NativeFloatToFloatFunc.__init__(self, arg)
+
+    def _name(self):
+        return "Log"
+
+    def _get_native_function(self, ctx):
+        libm = ctx.library("m")
+        return libm.log
+
+
+class Exp(NativeFloatToFloatFunc):
+
+    def __init__(self, arg):
+        NativeFloatToFloatFunc.__init__(self, arg)
+
+    def _name(self):
+        return "Exp"
+
+    def _get_native_function(self, ctx):
+        libm = ctx.library("m")
+        return libm.exp
 
 
 class Context(object):

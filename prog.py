@@ -48,13 +48,13 @@ def test3():
             name="foo",
             params=(x,),
             rettype=float,
-            expr=10 * Log(x) + 1)
+            expr=10 * Log(x) + Exp(x) + 1)
     engine = create_execution_engine()
     module = f.compile(engine)
     func_ptr = engine.get_pointer_to_function(module.get_function("foo"))
     cfunc = CFUNCTYPE(c_double, c_double)(func_ptr)
 
-    assert almost_eq(cfunc(3.5), 10.0 * math.log(3.5) + 1.0)
+    assert almost_eq(cfunc(3.5), 10.0 * math.log(3.5) + math.exp(3.5) + 1.0)
 
 
 if __name__ == '__main__':
