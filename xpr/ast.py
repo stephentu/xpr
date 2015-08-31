@@ -4,6 +4,9 @@
 
 from llvmlite import ir
 
+import ctypes
+from ctypes.util import find_library
+
 import llvmlite.binding as llvm
 
 _SUPPORTED_TYPES = {
@@ -126,11 +129,51 @@ class BinOp(Expr):
         return getattr(ctx.builder, op_name)(lhs, rhs)
 
 
+class UnaryFunc(Expr):
+
+    def __init__(self, arg):
+        self.arg = arg
+
+    def __str__(self):
+        return "{}({})".format(self._name(), str(self.arg))
+
+
+class Log(UnaryFunc):
+
+    def __init__(self, arg):
+        UnaryFunc.__init__(self, arg)
+
+    def _coerce_type(self):
+        return float
+
+    def _name(self):
+        return "Log"
+
+    def _compile(self, ctx):
+        arg = self.arg._compile(ctx)
+        if self.arg._coerce_type() != float:
+            arg = ctx.builder.sitofp(arg, ir.DoubleType())
+        libm = ctx.library("m")
+        f = libm.log
+        f.argtypes = [ctypes.c_double]
+        f.restype = ctypes.c_double
+
+        log_addr = ctypes.cast(libm.log, ctypes.c_void_p).value
+
+        log_ty = ir.FunctionType(ir.DoubleType(), [ir.DoubleType()])
+        # TODO(stephentu): generate random names to avoid name clashing
+        f = ctx.builder.inttoptr(ir.Constant(ir.IntType(64), log_addr), log_ty.as_pointer(), name='LogFunc')
+        return ctx.builder.call(f, [arg])
+
+
 class Context(object):
 
     def __init__(self, builder, env):
         self.builder = builder
         self.env = env
+
+    def library(self, name):
+        return ctypes.cdll.LoadLibrary(find_library(name))
 
 
 class Function(object):
