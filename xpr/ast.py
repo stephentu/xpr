@@ -35,8 +35,14 @@ class Expr(object):
     def __add__(self, other):
         return BinOp(self, other, '+')
 
+    def __radd__(self, other):
+        return BinOp(other, self, '+')
+
     def __sub__(self, other):
         return BinOp(self, other, '-')
+
+    def __rsub__(self, other):
+        return BinOp(other, self, '-')
 
     def __mul__(self, other):
         return BinOp(self, other, '*')

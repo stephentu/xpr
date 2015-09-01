@@ -74,8 +74,31 @@ def test4():
     assert almost_eq(cfunc(23.45), 23.45 * 23.45)
 
 
+def test5():
+    # logpdf of Gaussian
+    mu = 10.0
+    sigma = 2.0
+
+    x = Variable("x", float)
+    loggauss = -0.5 * math.log( 2.0 * math.pi * sigma * sigma ) - 0.5 * ((x - mu) ** 2) / (sigma * sigma)
+    f = Function(
+            name="foo",
+            params=(x,),
+            rettype=float,
+            expr=loggauss)
+    engine = create_execution_engine()
+    module = f.compile(engine)
+    func_ptr = engine.get_pointer_to_function(module.get_function("foo"))
+    cfunc = CFUNCTYPE(c_double, c_double)(func_ptr)
+
+    from scipy.stats import norm
+    assert almost_eq(cfunc(5.0), norm.logpdf(5.0, loc=mu, scale=sigma))
+
+
+
 if __name__ == '__main__':
     test1()
     test2()
     test3()
     test4()
+    test5()
