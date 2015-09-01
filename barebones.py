@@ -29,6 +29,7 @@ def test2():
 
     x = Variable("x", float)
     loggauss = -0.5 * math.log( 2.0 * math.pi * sigma * sigma ) - 0.5 * ((x - mu) ** 2) / (sigma * sigma)
+
     f = Function(
             name="foo",
             params=(x,),
@@ -38,9 +39,17 @@ def test2():
     module = f.compile(engine)
     func_ptr = engine.get_pointer_to_function(module.get_function("foo"))
 
-    samples = metropolis_hastings(func_ptr, sigma, 0.0, 100, 2)
-    plt.plot(np.arange(len(samples)), samples)
+    samples = metropolis_hastings(func_ptr, sigma, 0.0, 1000, 2)
+    #plt.plot(np.arange(len(samples)), samples)
+
+    n, bins, patches = plt.hist(samples[500:], 25, normed=1, histtype='stepfilled')
+    plt.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
+
+    # add a line showing the expected distribution
+    y = plt.normpdf(bins, mu, sigma)
+    l = plt.plot(bins, y, 'k--', linewidth=1.5)
     plt.show()
+
 
 
 if __name__ == '__main__':
