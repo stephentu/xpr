@@ -19,6 +19,7 @@ _SUPPORTED_OPS = {
     '-': 'Sub',
     '*': 'Mult',
     '/': 'Div',
+    '**': 'Pow',
 }
 
 _SUPPORTED_OPS_LLVM = {
@@ -45,6 +46,15 @@ class Expr(object):
 
     def __div__(self, other):
         return BinOp(self, other, '/')
+
+    def __rdiv__(self, other):
+        return BinOp(other, self, '/')
+
+    def __pow__(self, other):
+        return BinOp(self, other, '**')
+
+    def __rpow__(self, other):
+        return BinOp(other, self, '**')
 
 
 class Constant(Expr):
@@ -87,6 +97,12 @@ def _type_coercion(a, b):
     return rev_prio[max(prio[a], prio[b])]
 
 
+def _expr_coercion(expr, expected, actual, ctx):
+    # TODO(stephentu): very hacky
+    if expected == actual:
+        return expr
+    return ctx.builder.sitofp(expr, ir.DoubleType())
+
 def _try_promote_to_expr(expr):
     if isinstance(expr, Expr):
         return expr
@@ -113,19 +129,26 @@ class BinOp(Expr):
                 self.rhs._coerce_type())
 
     def _compile(self, ctx):
-        op_name = _SUPPORTED_OPS_LLVM[self.op]
         my_tpe = self._coerce_type()
+        if self.op == '**':
+            if not isinstance(self.rhs, Constant) or (self.rhs.val not in (2, 2.0)):
+                raise NotImplementedError("can only square things for now")
+            if my_tpe == float:
+                op_name = 'fmul'
+            else:
+                op_name = 'mul'
+            expr = _expr_coercion(
+                    self.lhs._compile(ctx), my_tpe, self.lhs._coerce_type(), ctx)
+            return getattr(ctx.builder, op_name)(expr, expr)
+        op_name = _SUPPORTED_OPS_LLVM[self.op]
         if my_tpe == float:
             op_name = 'f' + op_name
         elif my_tpe == int and self.op == '/':
             op_name = 'sdiv' # ugh
-        lhs = self.lhs._compile(ctx)
-        rhs = self.rhs._compile(ctx)
-        # TODO(stephentu): very hacky
-        if self.lhs._coerce_type() != my_tpe:
-            lhs = ctx.builder.sitofp(lhs, ir.DoubleType())
-        if self.rhs._coerce_type() != my_tpe:
-            rhs = ctx.builder.sitofp(rhs, ir.DoubleType())
+        lhs = _expr_coercion(
+                self.lhs._compile(ctx), my_tpe, self.lhs._coerce_type(), ctx)
+        rhs = _expr_coercion(
+                self.rhs._compile(ctx), my_tpe, self.rhs._coerce_type(), ctx)
         return getattr(ctx.builder, op_name)(lhs, rhs)
 
 

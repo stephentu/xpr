@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+### TODO(stephentu): move me to a nosetest
+
 from xpr import create_execution_engine
 from xpr.ast import *
 
@@ -57,7 +59,23 @@ def test3():
     assert almost_eq(cfunc(3.5), 10.0 * math.log(3.5) + math.exp(3.5) + 1.0)
 
 
+def test4():
+    x = Variable("x", float)
+    f = Function(
+            name="foo",
+            params=(x,),
+            rettype=float,
+            expr=x ** 2)
+    engine = create_execution_engine()
+    module = f.compile(engine)
+    func_ptr = engine.get_pointer_to_function(module.get_function("foo"))
+    cfunc = CFUNCTYPE(c_double, c_double)(func_ptr)
+
+    assert almost_eq(cfunc(23.45), 23.45 * 23.45)
+
+
 if __name__ == '__main__':
     test1()
     test2()
     test3()
+    test4()
